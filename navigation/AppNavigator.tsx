@@ -22,22 +22,35 @@ export default function AppNavigator() {
         <Stack.Screen
           name="Home"
           component={HomeScreen}
+          options={{
+            title: 'Trang Chủ',
+            headerBackVisible: false,
+            headerLeft: () => null,
+            gestureEnabled: false,
+          }}
         />
 
         <Stack.Screen
           name="CreateLot"
           component={CreateLotScreen}
+          options={{
+            title: 'Tạo Tên Vườn',
+          }}
         />
 
         <Stack.Screen
           name="Weighing"
           component={WeighingScreen}
+          options={{
+            title: 'Cân Hàng',
+            
+          }}
         />
         <Stack.Screen
           name="History"
           component={HistoryScreen}
           options={{
-            title: 'Lịch sử vườn',
+            title: 'Lịch Sử Vườn',
           }}
         />
 
@@ -45,7 +58,7 @@ export default function AppNavigator() {
           name="LotDetail"
           component={LotDetailScreen}
           options={{
-            title: 'Chi tiết vườn',
+            title: 'Chi Tiết Vườn',
           }}
         />
       </Stack.Navigator>
