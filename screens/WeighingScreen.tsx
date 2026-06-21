@@ -29,6 +29,10 @@ export default function WeighingScreen({ route, navigation }: any) {
   const continueMode = route?.params?.continueMode || false;
 
   const inputRef = useRef<TextInput>(null);
+  const mainScrollRef = useRef<ScrollView>(null);
+  
+  const exportScrollRef = useRef<ScrollView>(null);
+  const rejectScrollRef = useRef<ScrollView>(null);
 
   const [editingItem, setEditingItem] = useState<WeightItem | null>(null);
   const [editKg, setEditKg] = useState('');
@@ -38,9 +42,7 @@ export default function WeighingScreen({ route, navigation }: any) {
   const [weights, setWeights] = useState<WeightItem[]>([]);
 
   useEffect(() => {
-    if (continueMode && gardenName) {
-      loadWeights();
-    }
+    if (continueMode && gardenName) loadWeights();
   }, [continueMode, gardenName]);
 
   const loadWeights = async () => {
@@ -79,6 +81,14 @@ export default function WeighingScreen({ route, navigation }: any) {
 
     setKg('');
     inputRef.current?.focus();
+
+    setTimeout(() => {
+      if (selectedType === 'EXPORT') {
+        exportScrollRef.current?.scrollToEnd({ animated: true });
+      } else {
+        rejectScrollRef.current?.scrollToEnd({ animated: true });
+      }
+    }, 120);
   };
 
   const updateWeight = () => {
@@ -117,50 +127,48 @@ export default function WeighingScreen({ route, navigation }: any) {
       );
 
       Alert.alert('Thông báo', 'Đã lưu vườn thành công', [
-        {
-          text: 'OK',
-          onPress: () =>
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Home' }],
-            }),
-        },
+        { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) },
       ]);
     } catch (e) {
       console.log(e);
     }
   };
 
-  const renderGrid = (title: string, items: WeightItem[], color: string) => {
+  const renderGrid = (
+    title: string, 
+    items: WeightItem[], 
+    color: string, 
+    scrollRef: React.RefObject<ScrollView | null>
+  ) => {
     const columns: WeightItem[][] = [];
     for (let i = 0; i < items.length; i += 5) {
       columns.push(items.slice(i, i + 5));
     }
 
-    const getColumnTotal = (column: WeightItem[]) =>
-      column.reduce((sum, item) => sum + item.kg, 0);
+    const getColumnTotal = (col: WeightItem[]) => col.reduce((sum, item) => sum + item.kg, 0);
 
     return (
       <View style={styles.gridContainer}>
-        <Text style={styles.gridTitle}>{title}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <Text style={[styles.gridTitle, { color }]}>{title}</Text>
+        <ScrollView 
+          ref={scrollRef}
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+        >
           <View style={styles.gridRow}>
             {columns.map((column, colIndex) => (
               <View key={colIndex} style={styles.gridColumn}>
+                <Text style={styles.columnLabel}>C{colIndex + 1}</Text>
                 {column.map((item) => (
                   <Pressable
                     key={item.id}
                     style={[styles.gridItem, { borderColor: color }]}
-                    onPress={() => {
-                      setEditingItem(item);
-                      setEditKg(item.kg.toString());
-                    }}
+                    onPress={() => { setEditingItem(item); setEditKg(item.kg.toString()); }}
                     android_ripple={{ color: '#e5e7eb' }}
                   >
                     <Text style={styles.gridItemText}>{item.kg}</Text>
                   </Pressable>
                 ))}
-
                 <View style={[styles.gridColumnTotal, { backgroundColor: color + '20' }]}>
                   <Text style={[styles.gridColumnTotalText, { color }]}>
                     {getColumnTotal(column)}
@@ -177,49 +185,65 @@ export default function WeighingScreen({ route, navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'android' ? 80 : 0}
     >
       <SafeAreaView style={{ flex: 1 }}>
         <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
+        <ScrollView 
+          ref={mainScrollRef} 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.headerInfo}>
             <Text style={styles.gardenName}>Vườn: {gardenName}</Text>
+            <Text style={styles.runningTotal}>{totalAll} kg</Text>
+            <Text style={styles.statsCompact}>
+              Xuất: {totalExport}kg ({exportCount} ki) • 
+              Dạt: {totalReject}kg ({rejectCount} ki)
+            </Text>
           </View>
 
-          {/* Type Selector */}
+          {exportWeights.length > 0 && renderGrid('HÀNG XUẤT', exportWeights, '#10b981', exportScrollRef)}
+          {rejectWeights.length > 0 && renderGrid('HÀNG DẠT', rejectWeights, '#ef4444', rejectScrollRef)}
+        </ScrollView>
+
+        {/* Nút Xuất / Dạt - Đã tối ưu mạnh cho Android */}
+        <View style={styles.fixedBottom}>
           <View style={styles.typeSelector}>
             <Pressable
               onPress={() => setSelectedType('EXPORT')}
-              style={[
+              style={({ pressed }) => [
                 styles.typeButton,
                 selectedType === 'EXPORT' && styles.typeButtonActiveExport,
+                pressed && styles.typeButtonPressed,
               ]}
-              android_ripple={{ color: '#ffffff40' }}
+              android_ripple={{ color: '#ffffff60', borderless: false }}
             >
               <Text style={styles.typeButtonText}>XUẤT</Text>
             </Pressable>
 
             <Pressable
               onPress={() => setSelectedType('REJECT')}
-              style={[
+              style={({ pressed }) => [
                 styles.typeButton,
                 selectedType === 'REJECT' && styles.typeButtonActiveReject,
+                pressed && styles.typeButtonPressed,
               ]}
-              android_ripple={{ color: '#ffffff40' }}
+              android_ripple={{ color: '#ffffff60', borderless: false }}
             >
               <Text style={styles.typeButtonText}>DẠT</Text>
             </Pressable>
           </View>
 
-          {/* Input Area */}
-          <View style={styles.inputContainer}>
+          <View style={styles.inputRow}>
             <TextInput
               ref={inputRef}
               value={kg}
               onChangeText={setKg}
               keyboardType="numeric"
-              placeholder="Nhập số kg..."
+              placeholder="Nhập kg..."
               style={styles.input}
               autoFocus
               returnKeyType="done"
@@ -228,204 +252,210 @@ export default function WeighingScreen({ route, navigation }: any) {
 
             <Pressable
               onPress={addWeight}
-              style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+              style={styles.addButton}
               android_ripple={{ color: '#ffffff50' }}
             >
-              <Text style={styles.addButtonText}>THÊM CÂN</Text>
+              <Text style={styles.addButtonText}>THÊM</Text>
             </Pressable>
           </View>
 
-          {/* Finish Button */}
           <Pressable
             onPress={finishLot}
-            style={({ pressed }) => [styles.finishButton, pressed && styles.pressed]}
+            style={styles.finishButton}
             android_ripple={{ color: '#ffffff50' }}
           >
-            <Text style={styles.finishButtonText}>✅ KẾT THÚC LÔ</Text>
+            <Text style={styles.finishButtonText}>KẾT THÚC LÔ</Text>
           </Pressable>
-
-          {/* Grids */}
-          {renderGrid('HÀNG XUẤT', exportWeights, '#10b981')}
-          {renderGrid('HÀNG DẠT', rejectWeights, '#ef4444')}
-
-          {/* Summary */}
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>TỔNG KẾT</Text>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Xuất:</Text>
-              <Text style={styles.summaryValue}>{totalExport} kg ({exportCount} ki)</Text>
-            </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Dạt:</Text>
-              <Text style={styles.summaryValue}>{totalReject} kg ({rejectCount} ki)</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TỔNG CỘNG:</Text>
-              <Text style={styles.totalValue}>{totalAll} kg</Text>
-            </View>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-
-      {/* Edit Modal */}
-      <Modal visible={!!editingItem} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Sửa số kg</Text>
-            <TextInput
-              value={editKg}
-              onChangeText={setEditKg}
-              keyboardType="numeric"
-              style={styles.modalInput}
-              autoFocus
-            />
-            <Pressable
-              onPress={updateWeight}
-              style={({ pressed }) => [styles.modalSaveButton, pressed && styles.pressed]}
-              android_ripple={{ color: '#ffffff50' }}
-            >
-              <Text style={styles.modalSaveText}>LƯU THAY ĐỔI</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => {
-                setEditingItem(null);
-                setEditKg('');
-              }}
-              style={styles.modalCancelButton}
-              android_ripple={{ color: '#e5e7eb' }}
-            >
-              <Text style={styles.modalCancelText}>HỦY</Text>
-            </Pressable>
-          </View>
         </View>
-      </Modal>
+
+        <Modal visible={!!editingItem} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Sửa số kg</Text>
+              <TextInput
+                value={editKg}
+                onChangeText={setEditKg}
+                keyboardType="numeric"
+                style={styles.modalInput}
+                autoFocus
+              />
+              <Pressable onPress={updateWeight} style={styles.modalSaveButton}>
+                <Text style={styles.modalSaveText}>LƯU</Text>
+              </Pressable>
+              <Pressable onPress={() => { setEditingItem(null); setEditKg(''); }} style={styles.modalCancelButton}>
+                <Text style={styles.modalCancelText}>HỦY</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
-  scrollContent: { padding: 20, paddingBottom: 100 },
+  scrollContent: { padding: 12, paddingBottom: 20 },
 
-  header: { marginBottom: 24 },
-  gardenName: { fontSize: 24, fontWeight: '700', color: '#1e3a8a' },
-
-  typeSelector: { flexDirection: 'row', marginBottom: 24, gap: 12 },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
+  headerInfo: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 12,
+    elevation: 2,
     alignItems: 'center',
-    backgroundColor: '#e5e7eb',
-    elevation: 3,
   },
-  typeButtonActiveExport: { backgroundColor: '#10b981' },
-  typeButtonActiveReject: { backgroundColor: '#ef4444' },
-  typeButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  gardenName: { fontSize: 16, fontWeight: '700', color: '#1e3a8a' },
+  runningTotal: { fontSize: 26, fontWeight: '700', color: '#10b981', marginVertical: 4 },
+  statsCompact: { fontSize: 13.5, color: '#64748b', textAlign: 'center' },
 
-  inputContainer: { marginBottom: 20 },
+  gridContainer: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+    elevation: 2,
+  },
+  gridTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  gridRow: { flexDirection: 'row' },
+  gridColumn: { marginRight: 7, alignItems: 'center' },
+  columnLabel: { fontSize: 12, fontWeight: '700', color: '#64748b', marginBottom: 4 },
+  gridItem: {
+    width: 50,
+    height: 40,
+    borderWidth: 2,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+    backgroundColor: '#fff',
+  },
+  gridItemText: { fontSize: 16.5, fontWeight: '700' },
+  gridColumnTotal: {
+    width: 50,
+    height: 32,
+    borderRadius: 7,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridColumnTotalText: { fontSize: 13.5, fontWeight: '700' },
+
+  fixedBottom: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    elevation: 10,
+  },
+  typeSelector: {
+  flexDirection: 'row',
+  gap: 10,
+  marginBottom: 12,
+},
+
+typeButton: {
+  flex: 1,
+  paddingVertical: 15,
+  borderRadius: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
+
+  backgroundColor: '#e5e7eb',
+
+  elevation: 4,
+
+  borderWidth: 2,
+  borderColor: 'transparent',
+},
+
+typeButtonActiveExport: {
+  backgroundColor: '#10b981',
+
+  borderColor: '#059669',
+
+  elevation: 8,
+
+  shadowColor: '#10b981',
+  shadowOffset: {
+    width: 0,
+    height: 4,
+  },
+  shadowOpacity: 0.4,
+  shadowRadius: 8,
+},
+
+typeButtonActiveReject: {
+  backgroundColor: '#ef4444',
+
+  borderColor: '#dc2626',
+
+  elevation: 8,
+
+  shadowColor: '#ef4444',
+  shadowOffset: {
+    width: 0,
+    height: 4,
+  },
+  shadowOpacity: 0.4,
+  shadowRadius: 8,
+},
+
+typeButtonPressed: {
+  opacity: 0.85,
+  transform: [
+    {
+      scale: 0.96,
+    },
+  ],
+},
+
+typeButtonText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '700',
+},
+
+  inputRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   input: {
+    flex: 1,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
     borderRadius: 12,
-    padding: 16,
-    fontSize: 20,
-    marginBottom: 12,
+    padding: 14,
+    fontSize: 19,
     elevation: 2,
   },
   addButton: {
     backgroundColor: '#3b82f6',
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderRadius: 12,
-    alignItems: 'center',
+    justifyContent: 'center',
     elevation: 5,
   },
-  addButtonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  addButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   finishButton: {
     backgroundColor: '#10b981',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 30,
     elevation: 6,
   },
-  finishButtonText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  finishButtonText: { color: '#fff', fontSize: 16.5, fontWeight: '700' },
 
-  gridContainer: { marginBottom: 28 },
-  gridTitle: { fontSize: 20, fontWeight: '700', color: '#1e3a8a', marginBottom: 12 },
-  gridRow: { flexDirection: 'row' },
-  gridColumn: { marginRight: 12 },
-  gridItem: {
-    width: 68,
-    height: 58,
-    borderWidth: 2,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-    backgroundColor: '#fff',
-    elevation: 2,
-  },
-  gridItemText: { fontSize: 22, fontWeight: '700' },
-  gridColumnTotal: {
-    width: 68,
-    height: 48,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridColumnTotalText: { fontSize: 18, fontWeight: '700' },
-
-  summaryCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    elevation: 5,
-    marginBottom: 20,
-  },
-  summaryTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, color: '#1e3a8a' },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  summaryLabel: { fontSize: 16, color: '#64748b' },
-  summaryValue: { fontSize: 16, fontWeight: '600' },
-  totalRow: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
-  totalLabel: { fontSize: 18, fontWeight: '700' },
-  totalValue: { fontSize: 24, fontWeight: '700', color: '#10b981' },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 24,
-    borderRadius: 16,
-    elevation: 10,
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#fff', padding: 24, borderRadius: 16, elevation: 10 },
   modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
-  modalInput: {
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  modalSaveButton: {
-    backgroundColor: '#10b981',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-    elevation: 5,
-  },
-  modalSaveText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  modalCancelButton: { padding: 16, alignItems: 'center' },
+  modalInput: { borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 12, padding: 16, fontSize: 22, textAlign: 'center', marginBottom: 20 },
+  modalSaveButton: { backgroundColor: '#10b981', padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12 },
+  modalSaveText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  modalCancelButton: { padding: 14, alignItems: 'center' },
   modalCancelText: { color: '#64748b', fontSize: 16 },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
 });
