@@ -30,6 +30,18 @@ await db.execAsync(`
     createdAt TEXT
   );
 `);
+await db.execAsync(`
+CREATE TABLE IF NOT EXISTS lot_payments(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lotId INTEGER,
+  lossPerTon REAL,
+  lossKg REAL,
+  remainKg REAL,
+  pricePerKg REAL,
+  totalMoney REAL,
+  createdAt TEXT
+);
+`);
 
   
   };
